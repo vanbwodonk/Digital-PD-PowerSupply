@@ -1,2 +1,3 @@
-# esp32-pd-psu
-USB Power Delivery Power Supply using ESP32
+# Digital USB-PD Power Supply
+
+Low Cost USB Power Delivery Power Supply using CH32X035.
