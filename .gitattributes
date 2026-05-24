@@ -1,0 +1,58 @@
+# ======================================
+# FreeCAD
+# ======================================
+*.FCStd filter=lfs diff=lfs merge=lfs -text
+*.FCBak filter=lfs diff=lfs merge=lfs -text
+
+# ======================================
+# SolidWorks
+# ======================================
+*.SLDPRT filter=lfs diff=lfs merge=lfs -text
+*.SLDASM filter=lfs diff=lfs merge=lfs -text
+*.SLDDRW filter=lfs diff=lfs merge=lfs -text
+
+# ======================================
+# AutoCAD
+# ======================================
+*.DWG filter=lfs diff=lfs merge=lfs -text
+*.DXF filter=lfs diff=lfs merge=lfs -text
+*.DWT filter=lfs diff=lfs merge=lfs -text
+*.DWS filter=lfs diff=lfs merge=lfs -text
+
+# ======================================
+# Neutral CAD / interchange formats
+# ======================================
+*.STEP filter=lfs diff=lfs merge=lfs -text
+*.step filter=lfs diff=lfs merge=lfs -text
+*.STP filter=lfs diff=lfs merge=lfs -text
+*.stp filter=lfs diff=lfs merge=lfs -text
+*.IGES filter=lfs diff=lfs merge=lfs -text
+*.iges filter=lfs diff=lfs merge=lfs -text
+*.IGS filter=lfs diff=lfs merge=lfs -text
+*.igs filter=lfs diff=lfs merge=lfs -text
+
+# ======================================
+# Mesh / 3D model formats
+# ======================================
+*.STL filter=lfs diff=lfs merge=lfs -text
+*.stl filter=lfs diff=lfs merge=lfs -text
+*.OBJ filter=lfs diff=lfs merge=lfs -text
+*.obj filter=lfs diff=lfs merge=lfs -text
+*.3MF filter=lfs diff=lfs merge=lfs -text
+*.3mf filter=lfs diff=lfs merge=lfs -text
+
+# ======================================
+# KiCad
+# ======================================
+*.step filter=lfs diff=lfs merge=lfs -text
+*.wrl filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
+*.pdf filter=lfs diff=lfs merge=lfs -text
+
+# ======================================
+# General binary assets
+# ======================================
+*.bin filter=lfs diff=lfs merge=lfs -text
+*.hex filter=lfs diff=lfs merge=lfs -text
+*.elf filter=lfs diff=lfs merge=lfs -text
+*.iso filter=lfs diff=lfs merge=lfs -text
