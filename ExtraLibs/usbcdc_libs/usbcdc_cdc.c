@@ -19,11 +19,11 @@ volatile uint8_t CDC_writeBusyFlag = 0;
 #define GET_LINE_CODING           0x21
 #define SET_CONTROL_LINE_STATE    0x22
 
-void CDC_init(void) { USB_init(); }
+void CDC_init(void) { USB_init(); Delay_Ms(100);}
 
 uint8_t CDC_available(void) { return CDC_readByteCount; }
 uint8_t CDC_ready(void) { return !CDC_writeBusyFlag; }
-uint8_t CDC_connected(void) { return CDC_controlLineState & 0x01; }
+uint8_t CDC_connected(void) { return CDC_controlLineState & 0x01; Delay_Ms(100);}
 uint32_t CDC_baud(void) { return CDC_lineCoding.baudrate; }
 
 /* Forward declaration for ISR-based bootloader check */
