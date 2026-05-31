@@ -242,6 +242,167 @@ Power (W) = raw_power / 128.0
 
 ---
 
+## USB PD Sink Library — `usbpd.h`
+
+**Source:** `Peripheral-test/usbpd_sink_request/src/usbpd.h`
+
+Single-header USB PD sink library for CH32X035. Uses the built-in USBPD peripheral on PC14(CC1)/PC15(CC2). Supports negotiation with USB PD sources and dynamic reconfiguration via PDO selection.
+
+### Usage
+
+```c
+#define USBPD_IMPLEMENTATION   // in exactly ONE .c file
+#include "usbpd.h"
+
+USBPD_Init(eUSBPD_VCC_5V0);
+while (eUSBPD_BUSY == USBPD_SinkNegotiate());
+// Negotiated — now request desired voltage
+```
+
+### API
+
+| Function | Description |
+|----------|-------------|
+| `USBPD_Init(vcc)` | Initialize USBPD peripheral on PC14/CC1 + PC15/CC2 |
+| `USBPD_SinkNegotiate()` | Run state machine; returns `eUSBPD_OK` when PS is ready |
+| `USBPD_SelectPDO(index, voltageIn100mV)` | Select a PDO (PPS: set target voltage in 100mV units) |
+| `USBPD_GetCapabilities(&caps)` | Get source capabilities and PDO count |
+| `USBPD_IsPPS(pdo)` | True if PDO is a PPS APDO |
+| `USBPD_GetState()` | Current state machine state |
+| `USBPD_GetVersion()` | Negotiated PD spec revision |
+| `USBPD_Reset()` | Reset PD state machine |
+| `USBPD_StateToStr(state)` | Debug string for state |
+| `USBPD_ResultToStr(result)` | Debug string for result |
+
+### Result Codes
+
+```c
+eUSBPD_OK, eUSBPD_BUSY, eUSBPD_ERROR,
+eUSBPD_ERROR_ARGS, eUSBPD_ERROR_NOT_SUPPORTED, eUSBPD_ERROR_TIMEOUT
+```
+
+### State Machine
+
+```
+eSTATE_IDLE → eSTATE_CABLE_DETECT → eSTATE_SOURCE_CAP
+  → eSTATE_WAIT_ACCEPT → eSTATE_WAIT_PS_RDY → eSTATE_PS_RDY
+```
+
+### PDO Types (union `USBPD_SourcePDO_t`)
+
+| Type | Struct | Fields |
+|------|--------|--------|
+| Fixed Supply | `USBPD_SourceFixedSupplyPDO_t` | VoltageIn50mV, MaxCurrentIn10mA, PeakCurrent, flags |
+| Variable Supply | `USBPD_VariablePDO_t` | Min/MaxVoltageIn50mV, MaxCurrentIn10mA |
+| Battery Supply | `USBPD_BatteryPDO_t` | Min/MaxVoltageIn50mV, MaxPowerIn250mW |
+| PPS APDO | `USBPD_SPR_PPS_APDO_t` | Min/MaxVoltageIn100mV, MaxCurrentIn50mA |
+| EPR AVS APDO | `USBPD_EPR_AVS_APDO_t` | Min/MaxVoltageIn100mV, PDPIn1W |
+| SPR AVS APDO | `USBPD_SPR_AVS_APDO_t` | MaxCurrent15To20V, MaxCurrent9to15V |
+
+### Format Macros
+
+Printf-ready macros for logging PDO contents:
+
+```
+FIXED_SUPPLY_FMT / FIXED_SUPPLY_FMT_ARGS(pdo)
+VARIABLE_SUPPLY_FMT / VARIABLE_SUPPLY_FMT_ARGS(pdo)
+BATTERY_SUPPLY_FMT / BATTERY_SUPPLY_FMT_ARGS(pdo)
+SPR_PPS_FMT / SPR_PPS_FMT_ARGS(pdo)
+EPR_AVS_FMT / EPR_AVS_FMT_ARGS(pdo)
+SPR_AVS_FMT / SPR_AVS_FMT_ARGS(pdo)
+```
+
+Example:
+```c
+LOG(FIXED_SUPPLY_FMT, FIXED_SUPPLY_FMT_ARGS(pdo));
+```
+
+### Capabilities Message
+
+```c
+USBPD_SPR_CapabilitiesMessage_t caps;
+size_t count = USBPD_GetCapabilities(&caps);
+for (size_t i = 0; i < count; i++) {
+  USBPD_SourcePDO_t* pdo = &caps.Source[i];
+  // check pdo->Header.PDOType
+}
+```
+
+Up to 7 PDOs in a single source capabilities message.
+
+### `USBPD_SelectPDO()` Behavior
+
+- **Non-PPS PDOs** (Fixed, Variable, Battery): `voltageIn100mV` ignored — selects by index, requests max current.
+- **PPS PDOs**: clamps `voltageIn100mV` to PDO min/max, builds PPS RDO with requested voltage and max current.
+
+### Pin Config (PC14/PC15)
+
+- PC14 = CC1, PC15 = CC2 — configured as open-drain outputs.
+- CC comparator threshold set to 0.66V.
+- `USBPD_Init()` enables `RCC_USBPD`, sets `AFIO->CTLR` with `USBPD_IN_HVT` and optionally `USBPD_PHY_V33` for 3.3V VCC.
+
+### Compile Option
+
+In `funconfig.h`:
+```c
+#define FUNCONF_USBPD_NO_STR 1  // disable USBPD_StateToStr/ResultToStr to save flash
+```
+
+### Convenience Helpers (from `usbpd_sink_request.c`)
+
+```c
+// Match a fixed/variable PDO by exact voltage
+bool USBPD_RequestVoltage(uint32_t target_mV) {
+  USBPD_SPR_CapabilitiesMessage_t* caps;
+  size_t count = USBPD_GetCapabilities(&caps);
+  for (size_t i = 0; i < count; i++) {
+    USBPD_SourcePDO_t* pdo = &caps->Source[i];
+    switch (pdo->Header.PDOType) {
+      case eUSBPD_PDO_FIXED:
+        if (pdo->FixedSupply.VoltageIn50mV * 50 == target_mV)
+          return USBPD_SelectPDO(i, 0) == eUSBPD_OK;
+        break;
+      case eUSBPD_PDO_VARIABLE:
+        if (target_mV >= pdo->VariableSupply.MinVoltageIn50mV * 50 &&
+            target_mV <= pdo->VariableSupply.MaxVoltageIn50mV * 50)
+          return USBPD_SelectPDO(i, 0) == eUSBPD_OK;
+        break;
+      default: break;
+    }
+  }
+  return false;
+}
+
+// Match a PPS APDO by voltage range
+bool USBPD_RequestPPSVoltage(uint32_t target_mV) {
+  USBPD_SPR_CapabilitiesMessage_t* caps;
+  size_t count = USBPD_GetCapabilities(&caps);
+  for (size_t i = 0; i < count; i++) {
+    USBPD_SourcePDO_t* pdo = &caps->Source[i];
+    if (USBPD_IsPPS(pdo)) {
+      uint32_t v = target_mV / 100;
+      if (v >= pdo->SPR_PPS.MinVoltageIn100mV &&
+          v <= pdo->SPR_PPS.MaxVoltageIn100mV)
+        return USBPD_SelectPDO(i, v) == eUSBPD_OK;
+    }
+  }
+  return false;
+}
+```
+
+### PD Sink Negotiation Pattern
+
+```c
+USBPD_Init(eUSBPD_VCC_5V0);
+while (eUSBPD_BUSY == USBPD_SinkNegotiate());
+// Now USBPD_SelectPDO() can be called at any time
+USBPD_RequestVoltage(9000);  // request 9V
+```
+
+No re-negotiation needed — `USBPD_SelectPDO()` sends the request immediately via hardware.
+
+---
+
 ## Projects
 
 All projects under `Peripheral-test/`. Build with `pio run -t upload`.
@@ -252,6 +413,7 @@ All projects under `Peripheral-test/`. Build with `pio run -t upload`.
 | `Peripheral-test/exti_encoder/` | EXTI-based quadrature decoder on PA0/PA1, USB CDC debug | Experimenting |
 | `Peripheral-test/i2c-oled-remap/` | I2C1 remap to PC18/PC19, SSD1306 OLED | Working |
 | `Peripheral-test/i2c-ina219/` | I2C1 remap to PC18/PC19, INA219 current/voltage sensor | Working |
+| `Peripheral-test/usbpd_sink_request/` | USB PD sink, negotiates and cycles 5V/9V/12V/15V/20V | Working |
 
 ---
 
